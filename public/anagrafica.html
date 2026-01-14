@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="emerald">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anagrafica - Gestionale Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .clickable-row { cursor: pointer; transition: all 0.2s; border-bottom: 1px solid #f1f5f9; }
+        .clickable-row:hover { background-color: #f8fafc; }
+        .badge-status { font-weight: 800; font-size: 10px; padding: 10px; text-transform: uppercase; border-radius: 999px; width: 100px; text-align: center; color: white; }
+        .modal-box { max-height: 85vh; overflow-y: auto; }
+    </style>
+</head>
+<body class="bg-base-200 min-h-screen">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header id="main-header"></header>
+
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 mt-4">
+            <div>
+                <h1 class="text-5xl font-black text-gray-900 tracking-tighter italic uppercase">Enti e Soggetti</h1>
+                <p class="text-gray-500 mt-2 font-medium italic">Gestione relazionale soggetti accreditati.</p>
+            </div>
+            <div class="flex gap-4">
+                <input type="text" id="searchInput" placeholder="Cerca ente..." class="input input-bordered shadow-xl w-full md:w-96" onkeyup="filterTable()" />
+                <label for="modal-edit" onclick="resetForm()" class="btn btn-primary shadow-lg rounded-xl">
+                    <i data-lucide="plus" class="w-5 h-5 mr-2"></i> Nuovo
+                </label>
+            </div>
+        </div>
+
+        <div class="card bg-white shadow-2xl rounded-3xl overflow-hidden border border-base-300">
+            <div class="overflow-x-auto">
+                <table class="table w-full">
+                    <thead class="bg-gray-900 text-white text-xs font-bold uppercase">
+                        <tr><th class="py-6 px-8 text-center w-24">Tip</th><th>Ente / Relazioni</th><th class="text-center">Status</th><th class="text-right px-8">Dettaglio</th></tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <div id="loader" class="flex flex-col items-center justify-center p-32"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        </div>
+    </div>
+
+    <!-- MODAL EDIT -->
+    <input type="checkbox" id="modal-edit" class="modal-toggle" />
+    <div class="modal modal-bottom sm:modal-middle">
+      <div class="modal-box max-w-4xl rounded-3xl p-8 shadow-2xl relative">
+        <label for="modal-edit" class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4">✕</label>
+        <h3 id="modal-title-display" class="font-black text-2xl uppercase text-gray-900 mb-8 border-b-4 border-primary pb-2 inline-block">Dettaglio</h3>
+
+        <form id="editForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <input type="hidden" id="edit-id">
+            <div class="form-control md:col-span-2"><label class="label text-xs font-bold uppercase text-gray-400">Nome</label><input type="text" id="edit-soggetto" required class="input input-bordered bg-gray-50 font-black uppercase text-lg" /></div>
+            <div class="form-control"><label class="label text-xs font-bold uppercase text-gray-400">Email</label><input type="email" id="edit-mail" class="input input-bordered bg-gray-50" /></div>
+            <div class="form-control"><label class="label text-xs font-bold uppercase text-gray-400">PEC</label><input type="text" id="edit-pec" class="input input-bordered bg-gray-50" /></div>
+            
+            <div class="flex items-center gap-4 p-5 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <input type="checkbox" id="edit-tavolo" class="checkbox checkbox-primary" /><span class="font-black text-emerald-800 uppercase text-xs">Tavolo</span>
+            </div>
+            <div class="flex items-center gap-4 p-5 bg-amber-50 rounded-2xl border border-amber-100">
+                <input type="checkbox" id="edit-direttivo" class="checkbox checkbox-warning" /><span class="font-black text-amber-800 uppercase text-xs">Direttivo</span>
+            </div>
+
+            <!-- SEZIONI COLLEGAMENTI -->
+            <div id="section-referenti" class="md:col-span-1 mt-4 p-4 bg-gray-50 rounded-2xl hidden">
+                <h4 class="text-[11px] font-black uppercase mb-3 text-amber-600 border-b pb-1">Referenti</h4>
+                <div id="modal-referenti-list" class="space-y-2 mb-4"></div>
+                <div class="flex gap-2">
+                    <input type="text" id="new-ref-name" placeholder="Nuovo nome..." class="input input-xs input-bordered flex-1 uppercase">
+                    <button type="button" onclick="addRelation('referenti')" class="btn btn-xs btn-primary">+</button>
+                </div>
+            </div>
+
+            <div id="section-altri" class="md:col-span-1 mt-4 p-4 bg-gray-50 rounded-2xl hidden">
+                <h4 class="text-[11px] font-black uppercase mb-3 text-blue-600 border-b pb-1">Soggetti Correlati</h4>
+                <div id="modal-altri-list" class="space-y-2 mb-4"></div>
+                <div class="flex gap-2">
+                    <input type="text" id="new-alt-name" placeholder="Nuovo nome..." class="input input-xs input-bordered flex-1 uppercase">
+                    <button type="button" onclick="addRelation('altri')" class="btn btn-xs btn-info">+</button>
+                </div>
+            </div>
+        </form>
+
+        <!-- WARNING LABEL -->
+        <div class="mt-6 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 text-[10px] font-bold uppercase italic">
+            Attenzione: l'aggiunta, la modifica e la cancellazione dei Referenti o di altri soggetti ha effetto immediato sul database.
+        </div>
+
+        <div class="modal-action flex justify-between mt-8 border-t pt-8">
+            <button id="btn-delete" onclick="handleDelete()" class="btn btn-error btn-outline rounded-full px-10 hidden uppercase font-bold text-xs">Elimina Ente</button>
+            <div class="flex gap-3">
+                <label for="modal-edit" class="btn btn-ghost rounded-full px-8 uppercase font-bold text-xs">Chiudi</label>
+                <button onclick="handleSubmit()" class="btn btn-primary rounded-full px-12 text-white font-bold uppercase text-xs shadow-lg">Salva Modifiche Ente</button>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/ui.js"></script>
+    <script>
+        let localDataCache = [];
+
+        async function init() {
+            const data = await apiFetch('/associazioni');
+            if(!data) return;
+            localDataCache = data;
+            document.getElementById('loader').classList.add('hidden');
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = data.map(item => {
+                const refs = (item.REFERENTI_COLLEGATI || []).map(r => r.Nome).join(', ');
+                const alts = (item.ALTRI_SOGGETTI_COLLEGATI || []).map(s => s.Nome).join(', ');
+                return `
+                <tr class="clickable-row group" onclick="openEditModal('${item.ID}')">
+                    <td class="text-center font-black text-gray-400 text-[10px]">TIP ${item.ID_TIPOLOGIA || '1'}</td>
+                    <td class="py-6 px-8">
+                        <div class="font-black text-gray-900 text-lg uppercase group-hover:text-primary transition-all mb-1">${item.SOGGETTO}</div>
+                        <div class="text-[10px] opacity-60 italic">${refs ? 'Ref: '+refs : ''} ${alts ? ' | Altri: '+alts : ''}</div>
+                    </td>
+                    <td class="text-center">
+                        <div class="flex flex-col gap-2 items-center">
+                            ${item.TAVOLO ? '<span class="badge-status bg-emerald-500 shadow-sm">Tavolo</span>' : ''}
+                            ${item.DIRETTIVO_DELEGAZIONE ? '<span class="badge-status bg-amber-500 shadow-sm">Direttivo</span>' : ''}
+                        </div>
+                    </td>
+                    <td class="text-right px-8"><button class="btn btn-circle btn-primary btn-sm opacity-20 group-hover:opacity-100 transition-all"><i data-lucide="chevron-right"></i></button></td>
+                </tr>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function openEditModal(id) {
+            const ente = localDataCache.find(d => String(d.ID) === String(id));
+            if(!ente) return;
+            document.getElementById('edit-id').value = ente.ID;
+            document.getElementById('edit-soggetto').value = ente.SOGGETTO;
+            document.getElementById('edit-mail').value = ente.MAIL || '';
+            document.getElementById('edit-pec').value = ente.PEC || '';
+            document.getElementById('edit-tavolo').checked = !!ente.TAVOLO;
+            document.getElementById('edit-direttivo').checked = !!ente.DIRETTIVO_DELEGAZIONE;
+            document.getElementById('section-referenti').classList.remove('hidden');
+            document.getElementById('section-altri').classList.remove('hidden');
+            document.getElementById('btn-delete').classList.remove('hidden');
+            renderModalRelationList('modal-referenti-list', ente.REFERENTI_COLLEGATI, 'amber', 'referenti');
+            renderModalRelationList('modal-altri-list', ente.ALTRI_SOGGETTI_COLLEGATI, 'blue', 'altri');
+            document.getElementById('modal-edit').checked = true;
+            lucide.createIcons();
+        }
+
+        function renderModalRelationList(id, list, color, type) {
+            const container = document.getElementById(id);
+            container.innerHTML = (list && list.length) ? list.map(item => `
+                <div class="flex gap-2 items-center p-1 bg-${color}-50 border border-${color}-100 rounded-xl">
+                    <input type="text" id="input-${type}-${item.ID}" value="${item.Nome}" class="input input-xs flex-1 bg-transparent border-none font-bold text-[10px] uppercase">
+                    <button type="button" onclick="updateRelation('${type}', '${item.ID}')" class="text-success hover:scale-110"><i data-lucide="check-circle" class="w-4 h-4"></i></button>
+                    <button type="button" onclick="deleteRelation('${type}', '${item.ID}', '${item.Nome}')" class="text-error hover:scale-110"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>`).join('') : '<p class="text-[10px] text-gray-300 italic">Nessun collegamento.</p>';
+            lucide.createIcons();
+        }
+
+        async function addRelation(type) {
+            const assId = document.getElementById('edit-id').value;
+            const inputId = type === 'referenti' ? 'new-ref-name' : 'new-alt-name';
+            const nome = document.getElementById(inputId).value.toUpperCase();
+            if(!nome) return;
+            if(!confirm(`Aggiungere "${nome}"?`)) return;
+            const res = await apiFetch(type === 'referenti' ? '/referenti' : '/altri-soggetti', {
+                method: 'POST', body: JSON.stringify({ ID_Associazione: assId, Nome: nome })
+            });
+            if(res) { document.getElementById(inputId).value = ''; refreshAndOpen(assId); }
+        }
+
+        async function updateRelation(type, id) {
+            const newName = document.getElementById(`input-${type}-${id}`).value.toUpperCase();
+            if(!confirm(`Salvare la modifica in "${newName}"?`)) return;
+            const res = await apiFetch(type === 'referenti' ? `/referenti/${id}` : `/altri-soggetti/${id}`, {
+                method: 'PUT', body: JSON.stringify({ Nome: newName })
+            });
+            if(res) refreshAndOpen(document.getElementById('edit-id').value);
+        }
+
+        async function deleteRelation(type, id, nome) {
+            if(!confirm(`Eliminare definitivamente "${nome}"?`)) return;
+            const res = await apiFetch(type === 'referenti' ? `/referenti/${id}` : `/altri-soggetti/${id}`, { method: 'DELETE' });
+            if(res) refreshAndOpen(document.getElementById('edit-id').value);
+        }
+
+        async function refreshAndOpen(assId) {
+            const data = await apiFetch('/associazioni');
+            if(data) { localDataCache = data; renderTable(data); openEditModal(assId); }
+        }
+
+        async function handleSubmit() {
+            const id = document.getElementById('edit-id').value;
+            const payload = {
+                SOGGETTO: document.getElementById('edit-soggetto').value.toUpperCase(),
+                MAIL: document.getElementById('edit-mail').value,
+                PEC: document.getElementById('edit-pec').value,
+                TAVOLO: document.getElementById('edit-tavolo').checked ? 1 : 0,
+                DIRETTIVO_DELEGAZIONE: document.getElementById('edit-direttivo').checked ? 1 : 0
+            };
+            const res = await apiFetch(id ? `/associazioni/${id}` : '/associazioni', { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+            if(res) { document.getElementById('modal-edit').checked = false; init(); }
+        }
+
+        async function handleDelete() {
+            if(!confirm("Eliminare definitivamente l'ente e tutti i suoi dati?")) return;
+            const res = await apiFetch(`/associazioni/${document.getElementById('edit-id').value}`, { method: 'DELETE' });
+            if(res) { document.getElementById('modal-edit').checked = false; init(); }
+        }
+
+        function resetForm() {
+            document.getElementById('editForm').reset();
+            document.getElementById('edit-id').value = '';
+            document.getElementById('section-referenti').classList.add('hidden');
+            document.getElementById('section-altri').classList.add('hidden');
+            document.getElementById('btn-delete').classList.add('hidden');
+        }
+
+        function filterTable() {
+            const q = document.getElementById("searchInput").value.toUpperCase();
+            const rows = document.getElementById("tableBody").getElementsByTagName("tr");
+            for (let r of rows) r.style.display = r.innerText.toUpperCase().includes(q) ? "" : "none";
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
